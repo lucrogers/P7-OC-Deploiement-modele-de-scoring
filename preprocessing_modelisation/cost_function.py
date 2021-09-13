@@ -65,7 +65,8 @@ def lineplot(y, x='threshold'):
         # adding a vertical line for the average passengers per flight
         argmax = df[y].idxmax()
         opt_x = df.loc[argmax, x]
-        plt.axvline(opt_x, color='#23a62c', label='optimal threshold', linestyle='--')
+        dy = (df[y].max()+0.04)/(0.04+0.07)*0.95
+        plt.axvline(opt_x, ymax=dy, color='#23a62c', label='optimal threshold', linestyle='--')
         
             # adding data label to mean line
         plt.text(x = opt_x*1.03, # x-coordinate position of data label, adjusted to be 3 right of the data point
