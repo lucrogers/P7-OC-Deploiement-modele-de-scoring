@@ -22,25 +22,21 @@ n = len(df)
 
 # Profits et coûts 
 cost = -1       # prêt accordé et non remboursé
-profit = 0.1   # prêt accordé et remboursé
+profit = 0.35   # prêt accordé et remboursé
 
 results=[]
-for profit in [0.15, 0.1, 0.05]:
+for profit in [0.05, 0.1, 0.15]:
     for q in range(101):
         thresh = q/100
         col = f'thresh={thresh}'
         df[col] = np.where(df['PREDICTIONS']>=thresh, 1, 0)
         accuracy = accuracy_score(df['TARGET'],df[col])
-        #avg_amount=[]
         
-        #p = len(df[df[col]==1])/n
         TN = len(df[(df[col]==0) & (df['TARGET']==0)])/n  # True negatives: clients acceptés et qui rapportent du profit
         FN = len(df[(df[col]==0) & (df['TARGET']==1)])/n  # False negatives: clients acceptés et qui engendrent de la perte
-        #TP = len(df[(df[col]==1) & (df['TARGET']==1)])/n
-        #avg_profit_applicant = (1-TP)*profit + TP*cost
+
         avg_profit_applicant = profit*TN + cost*FN        # Profit moyen par client lorsque le crédit est accordé
     
-        #avg_amt_applicant=[]
         accepted = FN + TN                              # Total des crédits accordés
         avg_profit = avg_profit_applicant * accepted    # Profit réalisé moyen
         results.append([thresh, TN, FN, accepted, accuracy, avg_profit_applicant, avg_profit, profit])
@@ -48,7 +44,15 @@ for profit in [0.15, 0.1, 0.05]:
         #precision = TP/(TP+FP)
         #recall = TP/(TP+FN)
     
-liste_col = ['threshold', 'True negatives %', 'False negatives %', 'Credit accepted %', 'Accuracy', 'Average profit per applicant', 'Average profit total', 'profit']
+liste_col = ['threshold',
+             'True negatives %',
+             'False negatives %',  
+             'Credit accepted %',
+             'Accuracy', 
+             'Average profit per applicant', 
+             'Average profit total',
+             'profit']
+
 df_results_per_threshold = pd.DataFrame(results, columns=liste_col)
 
 
@@ -68,9 +72,8 @@ def lineplot(y, x='threshold'):
         dy = (df[y].max()+0.04)/(0.04+0.07)*0.95
         plt.axvline(opt_x, ymax=dy, color='#23a62c', label='optimal threshold', linestyle='--')
         
-            # adding data label to mean line
+        # adding data label to mean line
         plt.text(x = opt_x*1.03, # x-coordinate position of data label, adjusted to be 3 right of the data point
-         #y = max([h.get_height() for h in ax.patches]), # y-coordinate position of data label, to take max height 
          y = 1.02*df[y].max(), # y-coordinate position of data label, to take max height 
          s = 'optimal threshold: {:.2f}'.format(df.loc[argmax, x]), # data label
          color = 'black') # colour of the vertical mean line
