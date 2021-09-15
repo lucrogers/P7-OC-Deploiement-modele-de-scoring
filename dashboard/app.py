@@ -32,13 +32,6 @@ infos_clients = ['SK_ID_CURR', 'TARGET','NAME_CONTRACT_TYPE', 'CODE_GENDER', 'AM
 """-------Dash parameters-------"""
 left_col_width = 4
 right_col_width = "100%"
-df0 = pd.DataFrame(
-    {
-        "First Name": ["Arthur", "Ford", "Zaphod", "Trillian"],
-        "Last Name": ["Dent", "Prefect", "Beeblebrox", "Astra"],
-    }
-)
-
 
 """-------Dash app-------"""
 
@@ -76,7 +69,7 @@ app.layout = dbc.Container([
 # =============================================================================
   
             dcc.Dropdown(id='user-id-dd',                         
-                         options=[{'label': i, 'value': i} for i in df0['First Name']],
+                         options=[{'label': i, 'value': i} for i in df['SK_ID_CURR']],
                          placeholder="Sélectionnez un client"
                                      )
 
@@ -152,17 +145,21 @@ app.layout = dbc.Container([
     Output('table', 'children'),
     Input('user-id-dd', 'value')
     )
-# =============================================================================
-# def update_value(user_id):
-#     user = df[infos_clients][df['SK_ID_CURR']==user_id].transpose().reset_index()
-#     #return dbc.Table.from_dataframe(user)
-#     return user.values
-# =============================================================================
-   
 def update_value(user_id):
-    user = df0[df0['First Name']==user_id]
+    if user_id != None:
+        user = df[infos_clients][df['SK_ID_CURR']==user_id].transpose().reset_index()
+        user.columns = ['Infos', 'Client']
+    else:
+        user = pd.DataFrame(columns=['Infos', 'Client'])
     #return dbc.Table.from_dataframe(user)
     return dbc.Table.from_dataframe(user, striped=True, bordered=True, hover=True)
+   
+# =============================================================================
+# def update_value(user_id):
+#     user = df0[df0['First Name']==user_id]
+#     #return dbc.Table.from_dataframe(user)
+#     return dbc.Table.from_dataframe(user, striped=True, bordered=True, hover=True)
+# =============================================================================
 
 """
 def update_value(user_id):
