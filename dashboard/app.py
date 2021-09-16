@@ -25,13 +25,15 @@ import shap
 feat_importance = pd.read_csv('output/feature_importance_model2_04.csv')
 """
 descriptions = pd.read_csv('input/HomeCredit_columns_description.csv')
-application_train = pd.read_csv('input/application_train.csv', nrows=50)
-infos_clients = application_train.columns[:10]
 
 
 """-------Chargement données et modèle-------"""
+application_train = pd.read_csv('input/application_train.csv', nrows=50)
+infos_clients = application_train.columns[:10]
+
 df = pd.read_csv('output/oof_model2_04.csv', nrows=50)
 model = pickle.load(open('outputs/lgbm_model.sav', 'rb'))
+
 drop_col =['SK_ID_CURR', 'TARGET', 'PREDICTIONS']
 dataframe=df.drop(columns=drop_col)
 explainer = shap.TreeExplainer(model)
@@ -47,7 +49,7 @@ class ShapObject:
         self.feature_names = feature_names # Column names
 
 """-------Dash parameters-------"""
-left_col_width = 4
+left_col_width = 3
 #right_col_width = "100%"
 
 """-------Dash app-------"""
@@ -78,7 +80,8 @@ app.layout = dbc.Container([
         dbc.Col([   
             
             #Dropdown
-            #dbc.Card("Dropdown", body=True)  
+            #dbc.Card("Dropdown", body=True) 
+            html.H4("Client sélectionné"),
  
             dcc.Dropdown(id='user-id-dd',                         
                          options=[{'label': i, 'value': i} for i in df['SK_ID_CURR']],
@@ -87,9 +90,67 @@ app.layout = dbc.Container([
                   
             ],width=left_col_width ), # end first col
         dbc.Col([
+            dbc.Row([
+                dbc.Col([
+                    # Card 1
+                    dbc.Card(id='card1',
+                             children= [
+                        
+                        dbc.CardHeader('Prédiction'),
+                        dbc.CardBody(
+                            [
+                                html.P(
+                                    'Contenu card',
+                                    className='card-text',
+                                    id='card-pred'
+                                    )
+                                ]
+                            )                                              
+                        ]),
+                    ]),
+
+                dbc.Col([                    
+                    # Card 2
+                    dbc.Card(children= [
+                        
+                        dbc.CardHeader('Score client'),
+                        dbc.CardBody(
+                            [
+                                html.P(
+                                    'Afficher score',
+                                    className='card-text',
+                                    id='card-score'
+                                    )
+                                ]
+                            #, style = {'display': 'none'}
+                            )                                              
+                        ]),  
+                    ]),
+                
+                dbc.Col([ 
+                    # Card 3
+                     dbc.Card(children= [
+                        
+                        dbc.CardHeader('Montant crédit'),
+                        dbc.CardBody(
+                            [
+                                html.P(
+                                    'Afficher montant',
+                                    className='card-text',
+                                    id='card-amt'
+                                    )
+                                ]
+                            #, style = {'display': 'none'}
+                            )                                              
+                        ])                  
+                    ])
+                               
+                ])
             
-            #Tabs client/groupe
-            dbc.Card("Tabs client/groupe", body=True)  
+# =============================================================================
+#             #Tabs client/groupe
+#             dbc.Card("Tabs client/groupe", body=True)  
+# =============================================================================
                       
             ], ) # end 2nd col
 
@@ -103,21 +164,8 @@ app.layout = dbc.Container([
             
             #Datatable infos clients
             #dbc.Card("Datatable infos clients", body=True)
-            #dbc.Table.from_dataframe(df0, id='user-table', striped=True, bordered=True, hover=True)
-            
-# =============================================================================
-#             html.Div(id='table',
-#                      children=[dash_table.DataTable(
-#                     id='user-table',
-#                     columns=[{"name": i, "id": i} for i in ['index', '2']],
-#                     data=[]
-#                          )])
-# =============================================================================
-            
             html.Div(id='table')
-            
-                   
-           
+                     
            ], width=left_col_width), #end 1st col
         
         dbc.Col([
@@ -200,6 +248,35 @@ def update_value(user_id):
     return dbc.Table.from_dataframe(user, striped=True, bordered=True, hover=True)
 
 @app.callback(
+    [Output('card-pred', 'children'),
+     Output('card1', 'color'),
+     Output('card-score', 'children'), 
+     Output('card-amt', 'children')],
+     Input('user-id-dd', 'value')
+    )
+def update_cards(user_id):
+    """
+    Update cards
+    
+    """
+    if user_id != None:
+        amt_loan = df[df['SK_ID_CURR']==user_id]['AMT_CREDIT'].reset_index(drop=True)[0]
+        score = round(df[df['SK_ID_CURR']==user_id]['PREDICTIONS'].reset_index(drop=True)[0],2)
+
+        if score <= seuil_score:
+            color ='success'
+            prediction = 'Crédit favorable'
+        #elif score <= seuil_score:
+        else:
+            color='warning'
+            prediction = 'Crédit à risque'            
+        return prediction, color, score.astype(str), amt_loan
+    else:
+        return '', '', '', ''
+            
+
+
+@app.callback(
     [Output("client-tab", "style"), Output("group-tab", "style")],
     [Input("tabs", "active_tab")],
 )
@@ -273,9 +350,9 @@ def generate_graphs(user_id):
         ))
         fig2.update_layout(
             waterfallgap=0.2,
-            autosize=True,
-            #width=800,
-            #height=400,
+            autosize=False,
+            width=770,
+            height=570,
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             yaxis=dict(
@@ -294,7 +371,9 @@ def generate_graphs(user_id):
                 ticks='outside',
                 ticklen=5
             ),
-            margin={'t': 25, 'b': 50},
+            #margin={'t': 25, 'b': 50},
+            #margin={'l': 15},
+
             shapes=[
                 dict(
                     type='line',
@@ -459,3 +538,4 @@ if __name__ == "__main__":
 # updated_fnames.columns = ['feature', 'value']
 # updated_fnames['shap_original'] = pd.Series(-shap_values_client[0][0])
 # =============================================================================
+
