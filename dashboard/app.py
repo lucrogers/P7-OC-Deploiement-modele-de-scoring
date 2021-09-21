@@ -17,21 +17,18 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
+from plotly.subplots import make_subplots
+import plotly.express as px
+
 
 import pickle
 import shap
-"""
-#df = pd.read_csv('output/oof_model2_04.csv')
-feat_importance = pd.read_csv('output/feature_importance_model2_04.csv')
-"""
-descriptions = pd.read_csv('input/HomeCredit_columns_description.csv')
-
 
 """-------Chargement données et modèle-------"""
-application_train = pd.read_csv('input/application_train.csv', nrows=50)
+application_train = pd.read_csv('outputs/application_train_reduced.csv')
 infos_clients = application_train.columns[:10]
 
-df = pd.read_csv('output/oof_model2_04.csv', nrows=50)
+df = pd.read_csv('outputs/df_reduced.csv', nrows=50)
 model = pickle.load(open('outputs/lgbm_model.sav', 'rb'))
 
 drop_col =['SK_ID_CURR', 'TARGET', 'PREDICTIONS']
@@ -63,7 +60,7 @@ app = dash.Dash(
 
 app.layout = dbc.Container([
     
-    
+    dcc.Store(id='important-feat'),
     #1 row
     dbc.Row([
         #Title
@@ -96,9 +93,9 @@ app.layout = dbc.Container([
                     dbc.Card(id='card1',
                              children= [
                         
-                        dbc.CardHeader('Prédiction'),
                         dbc.CardBody(
                             [
+                                html.H6("Prédiction", className="card-title"),
                                 html.P(
                                     'Contenu card',
                                     className='card-text',
@@ -113,9 +110,9 @@ app.layout = dbc.Container([
                     # Card 2
                     dbc.Card(children= [
                         
-                        dbc.CardHeader('Score client'),
                         dbc.CardBody(
                             [
+                                html.H6(f"Score client (cible = {seuil_score})", className="card-title"),                                
                                 html.P(
                                     'Afficher score',
                                     className='card-text',
@@ -131,9 +128,9 @@ app.layout = dbc.Container([
                     # Card 3
                      dbc.Card(children= [
                         
-                        dbc.CardHeader('Montant crédit'),
                         dbc.CardBody(
                             [
+                                html.H6("Montant crédit", className="card-title"),
                                 html.P(
                                     'Afficher montant',
                                     className='card-text',
@@ -147,11 +144,7 @@ app.layout = dbc.Container([
                                
                 ])
             
-# =============================================================================
-#             #Tabs client/groupe
-#             dbc.Card("Tabs client/groupe", body=True)  
-# =============================================================================
-                      
+                     
             ], ) # end 2nd col
 
         ]), # end 2nd row
@@ -185,20 +178,27 @@ app.layout = dbc.Container([
                     [
                         #add dbc options,
                         dbc.Col(dcc.Graph(id='wf-graph', figure={})),
-                        #dbc.Col(dcc.Graph(id='wf-graph', figure={}, width = 4))
                     ]
                 )
             ], style = {'display': 'none'}), 
 
             html.Div(id="group-tab", className="p-4", children= [
                 dbc.Row(
-                    [
-                        #add dbc options,
-                        dbc.Col(dcc.Graph(id='hist-1', figure={})),
-                        dbc.Col(dcc.Graph(id='hist-2', figure={}))
+                    [dbc.Row([
+                        #
+                        dbc.Col(dcc.Dropdown(id='dd-group',                         
+                                     options=[{'label': i, 'value': i} for i in dataframe.columns],
+                                     value=['EXT_SOURCES_MEAN', 'EXT_SOURCE_3', 'AMT_ANNUITY', 'CREDIT_TO_GOODS_RATIO'],
+                                     multi=True
+                                                 ))
+                        ]),
+                    dbc.Row([
+                        dbc.Col(dcc.Graph(id='hist', figure={})),
+                        #
+                        ])
                     ]
                 )
-            ]), 
+            ]) 
                    
             ]) # end 2nd col
         
@@ -211,21 +211,33 @@ app.layout = dbc.Container([
         dbc.Col([
             
             #Annotations
-            dbc.Card("Annotations", body=True) 
+            dbc.Card(
+                [
+                    dbc.CardHeader(html.H6("Observations", className="card-title")),
+                    dbc.CardBody(
+                        [
+                            html.Div([dcc.Textarea()])
+                            ]
+                        )
+                    ]
+                )
                        
             ], width=left_col_width), #end 1st col
         
         dbc.Col([
             
             # Text explications
-            dbc.Card("Text explications", body=True)  
-# =============================================================================
-#             dcc.Graph(
-#                 id='wf-graph',
-#                 config={'displayModeBar': False}
-#             )        
-# =============================================================================
-            ]) #end 2nd col
+            dbc.Card(
+                [
+                    dbc.CardHeader(html.H6("Explicabilité du modèle (définitons des variables ciblées)", className="card-title")),
+                    dbc.CardBody(
+                        [
+                            html.Div(id='table-explication')
+                            ]
+                        )
+                    ]
+                )
+            ])
         
         ]) # end 4th row       
 
@@ -234,11 +246,12 @@ app.layout = dbc.Container([
 
 
 
+
 @app.callback(
     Output('table', 'children'),
     Input('user-id-dd', 'value')
     )
-def update_value(user_id):
+def update_info_table(user_id):
     if user_id != None:
         user = application_train[infos_clients][application_train['SK_ID_CURR']==user_id].transpose().reset_index()
         user.columns = ['Infos', 'Client']
@@ -250,6 +263,7 @@ def update_value(user_id):
 @app.callback(
     [Output('card-pred', 'children'),
      Output('card1', 'color'),
+     Output('card1', 'inverse'),
      Output('card-score', 'children'), 
      Output('card-amt', 'children')],
      Input('user-id-dd', 'value')
@@ -264,15 +278,15 @@ def update_cards(user_id):
         score = round(df[df['SK_ID_CURR']==user_id]['PREDICTIONS'].reset_index(drop=True)[0],2)
 
         if score <= seuil_score:
-            color ='success'
+            color ='green'
             prediction = 'Crédit favorable'
         #elif score <= seuil_score:
         else:
-            color='warning'
+            color='red'
             prediction = 'Crédit à risque'            
-        return prediction, color, score.astype(str), amt_loan
+        return prediction, color, True, score.astype(str), amt_loan
     else:
-        return '', '', '', ''
+        return '', '', '', '', ''
             
 
 
@@ -295,11 +309,14 @@ def render_tab_content(active_tab):
             return on, off
     return "No tab selected"
 
-@app.callback([Output("wf-graph", "figure"), Output("hist-1", "figure"), Output("hist-2", "figure")],
-              [Input('user-id-dd', 'value')])
-def generate_graphs(user_id):
+@app.callback([Output("wf-graph", "figure"),  
+               Output("hist", "figure"),
+               Output("important-feat", "data")],
+              [Input('user-id-dd', 'value'),
+               Input("dd-group", "value")])
+def generate_graphs(user_id, selected_values):
     """
-    This callback generates three simple graphs from random data.
+    Update graphs
     """
     if user_id == None:
         # generate empty graphs when app loads
@@ -315,6 +332,8 @@ def generate_graphs(user_id):
         updated_fnames['shap_original'] = pd.Series(-shap_values_client[0][0])
         updated_fnames['shap_abs'] = updated_fnames['shap_original'].abs()
         updated_fnames = updated_fnames.sort_values(by=['shap_abs'], ascending=True)
+        important_features=updated_fnames.sort_values(by=['shap_abs'], ascending=False)['feature'][:5]
+        important_features = pd.DataFrame({'feature':important_features}).to_dict('records')
     
         # need to collapse those after first 9, so plot always shows 10 bars
         show_features = 9
@@ -332,7 +351,7 @@ def generate_graphs(user_id):
         plot_data.loc[(plot_data['text_pos'] == "outside") & (plot_data['shap_original'] > 0), 'text_col'] = "#F6222E"
         
         
-        fig2 = go.Figure(go.Waterfall(
+        fig1 = go.Figure(go.Waterfall(
             name="",
             orientation="h",
             measure=['absolute'] + ['relative']*show_features,
@@ -348,7 +367,7 @@ def generate_graphs(user_id):
             increasing={"marker": {"color": "#F6222E"}},
             hoverinfo="skip"
         ))
-        fig2.update_layout(
+        fig1.update_layout(
             waterfallgap=0.2,
             autosize=False,
             width=770,
@@ -388,8 +407,8 @@ def generate_graphs(user_id):
                 )
             ]
         )
-        fig2.update_yaxes(automargin=True)
-        fig2.add_annotation(
+        fig1.update_yaxes(automargin=True)
+        fig1.add_annotation(
             yref='paper',
             xref='x',
             x=explainer.expected_value[0],
@@ -398,7 +417,7 @@ def generate_graphs(user_id):
             showarrow=False,
             font=dict(color="black", size=14)
         )
-        fig2.add_annotation(
+        fig1.add_annotation(
             yref='paper',
             xref='x',
             x=plot_data['shap_original'].sum()+explainer.expected_value[0],
@@ -407,11 +426,56 @@ def generate_graphs(user_id):
             showarrow=False,
             font=dict(color="black", size=14)
         )
-        return fig2, {}, {}
+        
+        # Histogrammes
+        n_rows = len(selected_values) // 2 + 1
+        fig2 = make_subplots(rows=n_rows, cols=2)
+        
+        for n in range(len(selected_values)):
+            name = selected_values[n]
+            fig2.add_trace(
+                go.Histogram(x=df[name], name=name),
+            row=n//2+1, col=n%2+1
+        )
+        fig2.update_layout(width=770, 
+                           height=570,
+                           legend=dict(
+                                orientation="h",
+                                yanchor="bottom",
+                                y=1.02,
+                                xanchor="right",
+                                x=1
+                                ))
+        return fig1, fig2, important_features
     else:
         return {}, {}, {}
+ 
+@app.callback(
+    Output('table-explication', 'children'),
+    Input('important-feat', 'data')
+    )
+def update_explanation_table(important_feat):
+    """
+    Remplissage des définitions des features principales
 
-
+    """
+    table = pd.DataFrame(important_feat)
+    table['Définition'] = ""  # Ici remplir avec les définitions
+    return dbc.Table.from_dataframe(table, striped=True, bordered=True, hover=True)
+ 
+# =============================================================================
+# @app.callback(
+#     Output("dd-group", "options"), 
+#     Input("dd-group", "value"),
+# )
+# def limit_drop_options(selected_values):
+#     """Limit histogram dropdown to at most 4 actives selections"""
+#     if len(selected_values) > 4:
+#         return selected_values[:4]
+#     else:
+#         return dataframe.columns
+# 
+# =============================================================================
 # =============================================================================
 # @app.callback(
 #     Output('tab-content', 'children'),
@@ -539,3 +603,9 @@ if __name__ == "__main__":
 # updated_fnames['shap_original'] = pd.Series(-shap_values_client[0][0])
 # =============================================================================
 
+# =============================================================================
+# liste=['a','b','c','d']
+# dictio=pd.DataFrame({'feature':liste}).to_dict('records')
+# dff = pd.DataFrame(dictio)
+# dffd = pd.DataFrame({})
+# =============================================================================
