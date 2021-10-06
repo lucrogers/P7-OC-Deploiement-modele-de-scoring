@@ -3,8 +3,8 @@ Parcours Data Science
 
 Projet n°7 : "Implémentez un modèle de scoring"
 
-Source des données : https://www.kaggle.com/c/home-credit-default-risk/data
-Dashboard interactif : https://loan-management-dash.herokuapp.com
+- Source des données : https://www.kaggle.com/c/home-credit-default-risk/data
+- Dashboard interactif : https://loan-management-dash.herokuapp.com
 
 # Introduction du projet
 Ce projet a pour but de créer un modèle de scoring de la probabilité de défaut de paiement pour une entreprise de crédits à la consommation, et de le déployer en ligne sous forme de dashboard interactif afin que les gestionnaires puissent l'explorer avec leur client. Le dashboard doit répondre à des critères de transparence et doit donc permettre d'expliquer la prédiction du modèle à un public sans connaissance en machine learning.
