@@ -4,3 +4,5 @@ output
 dash test
 dashboard/venv
 __pycache__
+heroku_app
+assets copie
